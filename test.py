@@ -1,14 +1,22 @@
 from agents.challenge_generator import challenge_generator
 from agents.code_evaluator import code_evaluator
 from agents.theory_expert import answer_textbook_query
+from agents.supervisor import run_DSA_tutor_agent
+
+# res = answer_textbook_query("What is Binary Search Tree")
+
+# print(res)
 
 
-res = answer_textbook_query("What is Binary Search Tree")
+user_input = input("Enter a topic : ")
 
-print(res)
+response = run_DSA_tutor_agent(
+    user_input=user_input,
+    thread_id="test_user"
+)
 
-
-
+print("\nFINAL RESPONSE\n")
+print(response["answer"])
 
 
 
@@ -39,3 +47,6 @@ print(res)
 # res = code_evaluator(f"Evaluate this code: {answer} against this challenge: {question}")
 
 # print(res)
+
+
+
