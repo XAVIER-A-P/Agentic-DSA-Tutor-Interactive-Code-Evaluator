@@ -17,3 +17,15 @@ app = FastAPI(
     description="LagGraph Multi-Agent DSA Tutor Interactive Code Evaluator",
     version="1.0.0"
 )
+
+
+app.mount(
+    "/static",
+    StaticFiles(directory=str(BASE_DIR / "static")),
+    name="static"
+)
+
+
+templates = Jinja2Templates(
+    directory=str(BASE_DIR / "templates")
+)
