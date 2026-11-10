@@ -1,200 +1,191 @@
 /**
- * Frontend Core State Engine
- * Emulates the LangGraph cyclical multi-agent environment, routing phases,
- * and background Docker container sandboxed execution.
+ * Frontend Orchestration Core Engine
+ * Coordinates UI states and bridges payloads smoothly to the FastAPI /api/DSA_tutor endpoint.
  */
-
 document.addEventListener("DOMContentLoaded", () => {
-    // Initialise Lucide Icon Sets
+    // Render Icons
     lucide.createIcons();
 
-    // DOM References
-    const chatTimeline = document.getElementById("chatTimeline");
-    const agentInputForm = document.getElementById("agentInputForm");
-    const userInput = document.getElementById("userInput");
+    // DOM Nodes Mapping
+    const topicQueryForm = document.getElementById("topicQueryForm");
+    const topicInput = document.getElementById("topicInput");
+    const answerSpace = document.getElementById("answerSpace");
+    const ragStatus = document.getElementById("ragStatus");
+    const challengeSpace = document.getElementById("challengeSpace");
     const codeEditor = document.getElementById("codeEditor");
-    const submitCodeBtn = document.getElementById("submitCodeBtn");
+    const resetStubsBtn = document.getElementById("resetStubsBtn");
+    const submitSolutionBtn = document.getElementById("submitSolutionBtn");
     const consoleLogs = document.getElementById("consoleLogs");
     const runtimeBadge = document.getElementById("runtimeBadge");
-    const redisCheckpoint = document.getElementById("redisCheckpoint");
+    const threadIdDisplay = document.getElementById("threadIdDisplay");
+    const nextAgentBadge = document.getElementById("nextAgentBadge");
+    const llmCallsDisplay = document.getElementById("llmCallsDisplay");
+    const askBtn = document.getElementById("askBtn");
 
-    // Internal Application State Mocking Frame
-    let currentChallenge = null;
-    let checkpointCounter = 101;
+    // Tracks persistent multi-agent graph variables across loops
+    let currentThreadId = null;
 
-    // Agent Definitions Mapping Architecture Specifications
-    const AGENTS = {
-        ROUTER: { name: "Supervisor Router", icon: "git-branch", color: "text-amber-400 bg-amber-400/10 border-amber-500/20" },
-        GENERATOR: { name: "Challenge Generator", icon: "file-plus", color: "text-indigo-400 bg-indigo-400/10 border-indigo-500/20" },
-        EVALUATOR: { name: "Code Evaluator", icon: "shield", color: "text-cyan-400 bg-cyan-400/10 border-cyan-500/20" },
-        THEORY: { name: "Theory Expert (RAG)", icon: "book-open", color: "text-emerald-400 bg-emerald-400/10 border-emerald-500/20" }
-    };
-
-    /**
-     * Renders modular multi-agent updates onto the timeline display
-     */
-    function appendAgentMessage(agent, text, isCode = false) {
-        const messageDiv = document.createElement("div");
-        messageDiv.className = "flex gap-3 animate-fade-in";
-
-        const contentHTML = isCode 
-            ? `<pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap w-full">${escapeHTML(text)}</pre>`
-            : `<p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${text}</p>`;
-
-        messageDiv.innerHTML = `
-            <div class="w-7 h-7 rounded-lg shrink-0 flex items-center justify-center border ${agent.color}">
-                <i data-lucide="${agent.icon}" class="w-3.5 h-3.5"></i>
-            </div>
-            <div class="flex-1 space-y-1">
-                <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-semibold text-slate-400 tracking-wide">${agent.name}</span>
-                    <span class="text-[9px] text-slate-600 font-mono">${new Date().toLocaleTimeString()}</span>
-                </div>
-                ${contentHTML}
-            </div>
-        `;
-        
-        chatTimeline.appendChild(messageDiv);
-        lucide.createIcons();
-        chatTimeline.scrollTop = chatTimeline.scrollHeight;
-    }
-
-    /**
-     * Appends pure standard user message blocks
-     */
-    function appendUserMessage(text) {
-        const messageDiv = document.createElement("div");
-        messageDiv.className = "flex gap-3 justify-end";
-        messageDiv.innerHTML = `
-            <div class="flex-1 space-y-1 text-right max-w-[85%] ml-auto">
-                <div class="text-[11px] font-semibold text-slate-400 tracking-wide">Student</div>
-                <div class="bg-indigo-600/10 border border-indigo-500/20 px-3 py-2 rounded-lg text-xs text-slate-200 inline-block text-left">
-                    ${escapeHTML(text)}
-                </div>
-            </div>
-        `;
-        chatTimeline.appendChild(messageDiv);
-        chatTimeline.scrollTop = chatTimeline.scrollHeight;
-    }
-
-    /**
-     * Form Helper Utilities
-     */
-    window.fillSamplePrompt = function(promptText) {
-        userInput.value = promptText;
-        userInput.focus();
-    };
-
-    function escapeHTML(str) {
-        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    function updateCheckpoint() {
-        checkpointCounter += 1;
-        redisCheckpoint.innerText = `chk_tx_${checkpointCounter}`;
-    }
-
-    /**
-     * Input Router Logic Flow Handling (Phase 2 & Phase 3 Simulation)
-     */
-    agentInputForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const query = userInput.value.trim();
-        if (!query) return;
-
-        appendUserMessage(query);
-        userInput.value = "";
-
-        // Trigger Phase 2: Orchestration State Loop Transitions
-        setTimeout(() => {
-            appendAgentMessage(AGENTS.ROUTER, `Intercepted target prompt query. Updating centralized LangGraph session tracking vector context. Routing task trajectory directly to the Assignment Engine.`);
-            updateCheckpoint();
-        }, 600);
-
-        // Trigger Phase 3: Simulated Problem Synthesis & Embedding Evaluation
-        if (query.toLowerCase().includes("binary search tree") || query.toLowerCase().includes("bst")) {
-            setTimeout(() => {
-                appendAgentMessage(AGENTS.GENERATOR, `Scanning base textbook vectors on node configuration mechanics. Instantiating medium tier challenge prompt framework...`);
-            }, 1600);
-
-            setTimeout(() => {
-                currentChallenge = "bst";
-                const problemPrompt = `### Challenge: Validate Binary Search Tree Accuracy\n\nImplement an analytical verification algorithm determining if a given binary root construct fulfills structural constraint laws matching traditional text patterns (Left Child < Root < Right Child).`;
-                appendAgentMessage(AGENTS.GENERATOR, problemPrompt);
-                
-                // Inject scaffolding signature code straight into IDE component window
-                codeEditor.value = `def is_valid_bst(root):\n    # TODO: Implement complexity boundaries within O(N) constraints\n    # The structural testing environment will isolate metrics securely\n    pass\n`;
-                updateCheckpoint();
-            }, 2800);
-        } else {
-            // General Architectural Fallback Path
-            setTimeout(() => {
-                appendAgentMessage(AGENTS.THEORY, `Query directed to Qdrant indexes. Extraction completed: Textbook insights dictate that functional application structures scale explicitly relative to depth limitations during processing execution patterns.`);
-                updateCheckpoint();
-            }, 1800);
+    // Intercept keyboard Tab entries inside code window for standard indent spacing
+    codeEditor.addEventListener("keydown", (e) => {
+        if (e.key === "Tab") {
+            e.preventDefault();
+            const start = codeEditor.selectionStart;
+            const end = codeEditor.selectionEnd;
+            codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
+            codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
         }
     });
 
     /**
-     * Code Submission Pipeline Handling (Phase 4 Execution Lifecycle simulation)
+     * Unified Pipeline to dispatch data inputs straight into backend schema targets
+     * @param {string} incomingMessage - Target text prompt or source code structure string
      */
-    submitCodeBtn.addEventListener("click", () => {
-        const activeScript = codeEditor.value.trim();
-        if (!activeScript) {
-            alert("The IDE workspace context appears empty. Input functional structures before executing scripts.");
+    async function postToDSATutor(incomingMessage) {
+        try {
+            // Apply workspace interactive layout processing locks
+            askBtn.disabled = true;
+            submitSolutionBtn.disabled = true;
+            ragStatus.innerText = "PROCESSING LOOP";
+            ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-mono animate-pulse";
+
+            const response = await fetch("/api/DSA_tutor", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                    message: incomingMessage,
+                    thread_id: currentThreadId
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP Network error occurred: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (!data.success) {
+                showConsoleError(data.error || "Unknown Multi-Agent processing loop failure.");
+                return;
+            }
+
+            // Sync state session identifiers tracking checkpointer structures
+            if (data.thread_id) {
+                currentThreadId = data.thread_id;
+                threadIdDisplay.innerText = currentThreadId;
+            }
+            
+            if (data.next_agent) {
+                nextAgentBadge.innerText = data.next_agent;
+            }
+
+            if (data.llm_calls !== undefined) {
+                llmCallsDisplay.innerText = `Calls: ${data.llm_calls}`;
+            }
+
+            // 1. Process and Populate: AI Knowledge Answer Space
+            if (data.answer) {
+                ragStatus.innerText = "SYNC COMPLETE";
+                ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono";
+                
+                let renderHtml = `<div class="text-slate-300 text-xs space-y-3 leading-relaxed">`;
+                renderHtml += `<p class="whitespace-pre-line">${escapeHTML(data.answer)}</p>`;
+                
+                // Incorporate dynamic time-complexity metrics if verified by analyzer pass
+                if (data.complexity_analysis) {
+                    renderHtml += `
+                        <div class="mt-4 p-3 bg-slate-900 border border-slate-800 rounded-lg font-mono">
+                            <div class="text-xs font-bold text-indigo-400 mb-1">Big-O Syntactic Inspection Profile:</div>
+                            <p class="text-[11px] text-slate-300 whitespace-pre-wrap">${escapeHTML(data.complexity_analysis)}</p>
+                        </div>`;
+                }
+                renderHtml += `</div>`;
+                answerSpace.innerHTML = renderHtml;
+            }
+
+            // 2. Process and Populate: Challenge prompt statement workspace
+            if (data.generated_challenge) {
+                challengeSpace.innerHTML = `<div class="whitespace-pre-wrap text-xs font-mono text-slate-200">${escapeHTML(data.generated_challenge)}</div>`;
+            }
+
+            // 3. Populate default initial boilerplate signature fields into code area if currently clear
+            if (data.student_code && !codeEditor.value.trim()) {
+                codeEditor.value = data.student_code;
+            }
+
+            // 4. Process and Populate: Live evaluation output log stream metrics
+            if (data.execution_result) {
+                runtimeBadge.innerText = "EVALUATION FINISHED";
+                runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 font-mono font-bold";
+                
+                consoleLogs.innerHTML = `
+                    <div class="text-emerald-400 font-mono text-xs whitespace-pre-wrap">${escapeHTML(data.execution_result)}</div>
+                `;
+            }
+
+        } catch (error) {
+            showConsoleError(error.message);
+        } exportFinally: {
+            askBtn.disabled = false;
+            submitSolutionBtn.disabled = false;
+            if (ragStatus.innerText === "PROCESSING LOOP") {
+                ragStatus.innerText = "STANDBY";
+                ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-500 font-mono";
+            }
+        }
+    }
+
+    /**
+     * Prints clean error metrics to terminal window
+     * @param {string} errorMsg - Summary error logs message
+     */
+    function showConsoleError(errorMsg) {
+        runtimeBadge.innerText = "SYSTEM ERROR";
+        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-mono font-bold";
+        consoleLogs.innerHTML = `<div class="text-rose-400 font-semibold">&gt; Runtime Call Exception:</div>
+                                 <div class="text-rose-500/80 font-mono text-xs mt-1">${escapeHTML(errorMsg)}</div>`;
+    }
+
+    /**
+     * Standard security string encoder helper preventing visual markup injections
+     */
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Connect form text input fields to RAG tracking routines
+    topicQueryForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const userInputText = topicInput.value.trim();
+        if (!userInputText) return;
+        postToDSATutor(userInputText);
+    });
+
+    // Connect standard solution button inputs to sandbox execution loops
+    submitSolutionBtn.addEventListener("click", () => {
+        const payloadScript = codeEditor.value.trim();
+        if (!payloadScript) {
+            alert("The code workspace editor is empty. Enter functional scripts before processing code evaluation.");
             return;
         }
-
-        // Set UI UI State indicators to Sandbox Active Mode
-        submitCodeBtn.disabled = true;
-        submitCodeBtn.innerText = "Running Test Harness...";
-        runtimeBadge.innerText = "Queued (Celery)";
-        runtimeBadge.className = "text-[10px] uppercase font-bold tracking-wider text-amber-500";
         
-        consoleLogs.innerHTML = `<div class="text-indigo-400 animate-pulse">&gt; Dispatching code payloads to non-networked container layers...</div>`;
+        runtimeBadge.innerText = "SANDBOX RUNNING";
+        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-mono animate-pulse";
+        consoleLogs.innerHTML = `<div class="text-indigo-400 animate-pulse">&gt; Dispatching application text vector variables to non-networked container sandboxes...</div>`;
+        
+        // Pipe active text fields straight to standard post utility routes
+        postToDSATutor(payloadScript);
+    });
 
-        // Execution Pipeline Step 1: Routing & State Logging
-        setTimeout(() => {
-            appendAgentMessage(AGENTS.EVALUATOR, `Extracting algorithmic signatures. Packaging environment verification sequence payloads inside strict Docker execution sandboxes.`);
-            consoleLogs.innerHTML += `<div class="text-slate-400">&gt; Worker picked up message frame. Initializing ephemeral container sandbox environment...</div>`;
-            runtimeBadge.innerText = "Executing";
-            updateCheckpoint();
-        }, 1000);
-
-        // Execution Pipeline Step 2: Running Complexity Verification Scans
-        setTimeout(() => {
-            consoleLogs.innerHTML += `<div class="text-slate-400">&gt; Running code execution vectors against local test modules...</div>`;
-            appendAgentMessage(AGENTS.EVALUATOR, `Executing Parallel Analytical Inspection: Processing static code structure scans via localized abstract trees to check for Big-O code compliance standard levels.`);
-        }, 2200);
-
-        // Execution Pipeline Step 3: Returning Outputs & Re-adjusting System Flags (Phase 5 State Sync)
-        setTimeout(() => {
-            // Reset submission control parameters
-            submitCodeBtn.disabled = false;
-            submitCodeBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Submit to Sandbox`;
-            lucide.createIcons();
-
-            // Evaluate payload conditions for tailored response tracking
-            if (activeScript.includes("pass") || activeScript.length < 120) {
-                runtimeBadge.innerText = "Failed Structural Standards";
-                runtimeBadge.className = "text-[10px] uppercase font-bold tracking-wider text-rose-500";
-
-                consoleLogs.innerHTML += `
-                    <div class="text-rose-400 font-semibold">&gt; TestSuite Status: FAILED</div>
-                    <div class="text-rose-500/80">AssertionError: The verification modules returned empty structures. Stub structures require implementation features.</div>
-                `;
-
-                appendAgentMessage(AGENTS.THEORY, `Compilation diagnostics failure flagged inside internal memory loops. cross-referencing Textbook Chapter 4 (Tree Configurations):\n\nEnsure that you trace node boundaries explicitly down the stack utilizing infinity indicators as dynamic parameter caps. Code structures currently resolve to constant computational patterns.`);
-                        } else {
-                runtimeBadge.innerText = "Pass (Success)";
-                runtimeBadge.className = "text-[10px] uppercase font-bold tracking-wider text-emerald-500";
-                consoleLogs.innerHTML += `
-                <div class="text-emerald-400 font-semibold">&gt; TestSuite Status: SUCCESS</div>
-                <div class="text-slate-300">All test metrics passed inside sandboxed matrix successfully.</div>
-                `; 
-                appendAgentMessage(AGENTS.EVALUATOR, `Verification sequence finished cleanly. Code structural parameters match required O(N) evaluation bounds.`);
-                updateCheckpoint();
-            }
-        }, 3500);
+    // Reset code areas back to default environment states
+    resetStubsBtn.addEventListener("click", () => {
+        codeEditor.value = "";
+        consoleLogs.innerHTML = `<div class="text-slate-600">// Sandbox container runtime inactive. Execution logs from background validation pipelines will render inside this console.</div>`;
+        runtimeBadge.innerText = "Awaiting Signal";
+        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-500 uppercase tracking-wider font-bold";
     });
 });

@@ -1,125 +1,64 @@
 /* ==========================================================================
-   Base Design Variables & Root Layer
+   IDE Native Overrides & Structural Scroll Layout Adjustments
    ========================================================================== */
-:root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  
-  /* Core UI color scheme sync with Tailwind Slate-950 environment */
-  --bg-main: #020617;
-  --bg-panel: #0f172a;
-  --border-slate: #1e293b;
-}
 
-/* ==========================================================================
-   Structural Layout Reset & High-Fidelity Scrolling
-   ========================================================================== */
-html, 
-body {
-  height: 100%;
-  background-color: var(--bg-main);
-  color: #f1f5f9;
-  font-family: var(--font-sans);
-  margin: 0;
-  padding: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Custom Webkit scrollbars matching modern dark IDE themes */
+/* Custom Webkit scrollbars matching modern dark IDE system patterns */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
+    background: #020617; /* Matches Tailwind slate-950 */
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 4px;
+    background: #334155; /* Matches Tailwind slate-700 */
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+    background: #475569; /* Matches Tailwind slate-600 */
 }
 
-/* Selection aesthetics */
-::selection {
-  background-color: #312e81;
-  color: #e0e7ff;
+/* LeetCode IDE Textarea Formatting */
+.code-textarea {
+    tab-size: 4;
+    -moz-tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
 
-/* ==========================================================================
-   Component Specific Overrides
-   ========================================================================== */
-
-/* Native IDE Textarea Reset */
-textarea#codeEditor {
-  caret-color: #34d399; /* Emerald pulse caret */
-  tab-size: 4;
-  -moz-tab-size: 4;
-  white-space: pre;
-  overflow-wrap: normal;
+/* Active Workspace Document Headers Styling Rule */
+.tab-active {
+    color: #f8fafc;
+    border-bottom: 2px solid #3b82f6; /* Accent blue tab outline indicator */
+    background-color: #1e293b;
 }
 
-/* Ensure smooth text rendering on layout code panels */
-pre, 
-code, 
-textarea {
-  font-family: var(--font-mono) !important;
+/* Form inputs focus border layout ring fallback override (FIXED pseudo-class syntax) */
+form:focus-within {
+    box-shadow: 0 0 0 1px #475569;
 }
 
 /* ==========================================================================
-   Animations & Multi-Agent Transition States
+   Terminal & Dashboard Adjustments (Added for Completion)
    ========================================================================== */
 
-/* LangGraph Active Loop State Pulse */
-.agent-pulse {
-  animation: agentPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+/* Terminal line-height and text layout elements */
+.terminal-output, 
+.console-log {
+    line-height: 1.6;
+    letter-spacing: 0.025em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 }
 
-@keyframes agentPulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-  }
-  50% {
-    opacity: .4;
-    transform: scale(0.95);
-    box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.2);
-  }
+/* Utility to hide standard scrollbars if hidden panel behavior is needed */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
 }
-
-/* Fade-In transition framework for appended chat nodes */
-.animate-fade-in {
-  animation: fadeInFrame 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes fadeInFrame {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Sandboxed Execution Console Loading Line Pulse */
-.console-loading-pulse {
-  animation: consolePulse 1.5s infinite ease-in-out;
-}
-
-@keyframes consolePulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; color: #818cf8; }
-}
-
-/* Form input focus outer ring layout fallback override */
-form#agentInputForm:focus-within {
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }
