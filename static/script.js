@@ -1,191 +1,141 @@
-/**
- * Frontend Orchestration Core Engine
- * Coordinates UI states and bridges payloads smoothly to the FastAPI /api/DSA_tutor endpoint.
- */
+"use strict";
+
+let editor;
+let currentThreadId = null;
+const $ = (id) => document.getElementById(id);
+
+function setPill(element, text, kind = "") {
+  element.textContent = text;
+  element.className = "pill" + (kind ? ` ${kind}` : "");
+}
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[c]);
+}
+function showConsole(message, kind = "") {
+  $("consoleOutput").innerHTML = `<span class="${kind}">${escapeHTML(message)}</span>`;
+}
+async function apiRequest(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || data.error || `Request failed (${response.status})`);
+  return data;
+}
+
+async function checkHealth() {
+  try {
+    const response = await fetch("/health");
+    if (!response.ok) throw new Error("offline");
+    $("apiStatus").textContent = "Online";
+  } catch {
+    $("apiStatus").textContent = "Offline";
+  }
+}
+
+async function askTutor(message) {
+  $("askBtn").disabled = true;
+  setPill($("agentStatus"), "WORKING");
+  try {
+    const data = await apiRequest("/api/DSA_tutor", { message, thread_id: currentThreadId });
+    currentThreadId = data.thread_id || currentThreadId;
+    $("threadId").textContent = currentThreadId || "Active";
+    $("answerContent").textContent = data.answer || "The agent returned no explanation.";
+    $("challengeContent").textContent = data.generated_challenge || "No challenge was generated for this request.";
+    $("llmCalls").textContent = data.llm_calls ?? 0;
+    $("nextAgent").textContent = data.next_agent || "—";
+    if (data.student_code && (!editor || !editor.getValue().trim())) editor.setValue(data.student_code);
+    if (data.execution_result) showConsole(data.execution_result);
+    setPill($("agentStatus"), "COMPLETE");
+  } catch (error) {
+    $("answerContent").textContent = error.message;
+    setPill($("agentStatus"), "ERROR");
+  } finally {
+    $("askBtn").disabled = false;
+  }
+}
+
+async function runCode() {
+  const code = editor ? editor.getValue() : "";
+  if (!code.trim()) {
+    showConsole("Enter Python code before running.", "console-error");
+    return;
+  }
+  $("runCodeBtn").disabled = true;
+  setPill($("executionStatus"), "RUNNING");
+  $("runHint").textContent = "Container starting...";
+  showConsole("Starting isolated Docker execution...");
+  try {
+    const data = await apiRequest("/api/execute", { code });
+    $("runtimeValue").textContent = `${data.execution_time_ms} ms`;
+    $("exitValue").textContent = data.return_code ?? "timeout";
+    setPill($("executionStatus"), data.status);
+    $("runHint").textContent = "Execution finished";
+    const output = [
+      data.stdout ? `STDOUT\n${data.stdout}` : "",
+      data.stderr ? `STDERR\n${data.stderr}` : "",
+      !data.stdout && !data.stderr ? "(No output)" : ""
+    ].filter(Boolean).join("\n\n");
+    showConsole(output, data.status === "Accepted" ? "console-success" : "console-error");
+  } catch (error) {
+    setPill($("executionStatus"), "ERROR");
+    $("runHint").textContent = "Execution failed";
+    showConsole(error.message, "console-error");
+  } finally {
+    $("runCodeBtn").disabled = false;
+  }
+}
+
+function initEditor() {
+  const starter = `# Write your Python solution here\n\ndef solve():\n    # Example: read input and print your answer\n    pass\n\n\nif __name__ == "__main__":\n    solve()\n`;
+  if (window.require) {
+    require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" } });
+    require(["vs/editor/editor.main"], () => {
+      editor = monaco.editor.create($("editor"), {
+        value: starter, language: "python", theme: "vs-dark",
+        automaticLayout: true, minimap: { enabled: false },
+        fontSize: 13, lineHeight: 22, tabSize: 4,
+        scrollBeyondLastLine: false, roundedSelection: false,
+        padding: { top: 14, bottom: 14 }
+      });
+    });
+  } else {
+    $("editor").innerHTML = '<textarea id="fallbackEditor" spellcheck="false"></textarea>';
+    $("fallbackEditor").value = starter;
+    $("fallbackEditor").style.cssText = "width:100%;height:100%;background:#090e19;color:#c7f0d8;border:0;padding:16px;font:13px monospace;resize:none";
+    editor = { getValue: () => $("fallbackEditor").value, setValue: (v) => $("fallbackEditor").value = v };
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
-    // Render Icons
-    lucide.createIcons();
-
-    // DOM Nodes Mapping
-    const topicQueryForm = document.getElementById("topicQueryForm");
-    const topicInput = document.getElementById("topicInput");
-    const answerSpace = document.getElementById("answerSpace");
-    const ragStatus = document.getElementById("ragStatus");
-    const challengeSpace = document.getElementById("challengeSpace");
-    const codeEditor = document.getElementById("codeEditor");
-    const resetStubsBtn = document.getElementById("resetStubsBtn");
-    const submitSolutionBtn = document.getElementById("submitSolutionBtn");
-    const consoleLogs = document.getElementById("consoleLogs");
-    const runtimeBadge = document.getElementById("runtimeBadge");
-    const threadIdDisplay = document.getElementById("threadIdDisplay");
-    const nextAgentBadge = document.getElementById("nextAgentBadge");
-    const llmCallsDisplay = document.getElementById("llmCallsDisplay");
-    const askBtn = document.getElementById("askBtn");
-
-    // Tracks persistent multi-agent graph variables across loops
-    let currentThreadId = null;
-
-    // Intercept keyboard Tab entries inside code window for standard indent spacing
-    codeEditor.addEventListener("keydown", (e) => {
-        if (e.key === "Tab") {
-            e.preventDefault();
-            const start = codeEditor.selectionStart;
-            const end = codeEditor.selectionEnd;
-            codeEditor.value = codeEditor.value.substring(0, start) + "    " + codeEditor.value.substring(end);
-            codeEditor.selectionStart = codeEditor.selectionEnd = start + 4;
-        }
-    });
-
-    /**
-     * Unified Pipeline to dispatch data inputs straight into backend schema targets
-     * @param {string} incomingMessage - Target text prompt or source code structure string
-     */
-    async function postToDSATutor(incomingMessage) {
-        try {
-            // Apply workspace interactive layout processing locks
-            askBtn.disabled = true;
-            submitSolutionBtn.disabled = true;
-            ragStatus.innerText = "PROCESSING LOOP";
-            ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-mono animate-pulse";
-
-            const response = await fetch("/api/DSA_tutor", {
-                method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    "Accept": "application/json"
-                },
-                body: JSON.stringify({
-                    message: incomingMessage,
-                    thread_id: currentThreadId
-                })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP Network error occurred: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            if (!data.success) {
-                showConsoleError(data.error || "Unknown Multi-Agent processing loop failure.");
-                return;
-            }
-
-            // Sync state session identifiers tracking checkpointer structures
-            if (data.thread_id) {
-                currentThreadId = data.thread_id;
-                threadIdDisplay.innerText = currentThreadId;
-            }
-            
-            if (data.next_agent) {
-                nextAgentBadge.innerText = data.next_agent;
-            }
-
-            if (data.llm_calls !== undefined) {
-                llmCallsDisplay.innerText = `Calls: ${data.llm_calls}`;
-            }
-
-            // 1. Process and Populate: AI Knowledge Answer Space
-            if (data.answer) {
-                ragStatus.innerText = "SYNC COMPLETE";
-                ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono";
-                
-                let renderHtml = `<div class="text-slate-300 text-xs space-y-3 leading-relaxed">`;
-                renderHtml += `<p class="whitespace-pre-line">${escapeHTML(data.answer)}</p>`;
-                
-                // Incorporate dynamic time-complexity metrics if verified by analyzer pass
-                if (data.complexity_analysis) {
-                    renderHtml += `
-                        <div class="mt-4 p-3 bg-slate-900 border border-slate-800 rounded-lg font-mono">
-                            <div class="text-xs font-bold text-indigo-400 mb-1">Big-O Syntactic Inspection Profile:</div>
-                            <p class="text-[11px] text-slate-300 whitespace-pre-wrap">${escapeHTML(data.complexity_analysis)}</p>
-                        </div>`;
-                }
-                renderHtml += `</div>`;
-                answerSpace.innerHTML = renderHtml;
-            }
-
-            // 2. Process and Populate: Challenge prompt statement workspace
-            if (data.generated_challenge) {
-                challengeSpace.innerHTML = `<div class="whitespace-pre-wrap text-xs font-mono text-slate-200">${escapeHTML(data.generated_challenge)}</div>`;
-            }
-
-            // 3. Populate default initial boilerplate signature fields into code area if currently clear
-            if (data.student_code && !codeEditor.value.trim()) {
-                codeEditor.value = data.student_code;
-            }
-
-            // 4. Process and Populate: Live evaluation output log stream metrics
-            if (data.execution_result) {
-                runtimeBadge.innerText = "EVALUATION FINISHED";
-                runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 font-mono font-bold";
-                
-                consoleLogs.innerHTML = `
-                    <div class="text-emerald-400 font-mono text-xs whitespace-pre-wrap">${escapeHTML(data.execution_result)}</div>
-                `;
-            }
-
-        } catch (error) {
-            showConsoleError(error.message);
-        } exportFinally: {
-            askBtn.disabled = false;
-            submitSolutionBtn.disabled = false;
-            if (ragStatus.innerText === "PROCESSING LOOP") {
-                ragStatus.innerText = "STANDBY";
-                ragStatus.className = "text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-500 font-mono";
-            }
-        }
-    }
-
-    /**
-     * Prints clean error metrics to terminal window
-     * @param {string} errorMsg - Summary error logs message
-     */
-    function showConsoleError(errorMsg) {
-        runtimeBadge.innerText = "SYSTEM ERROR";
-        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-mono font-bold";
-        consoleLogs.innerHTML = `<div class="text-rose-400 font-semibold">&gt; Runtime Call Exception:</div>
-                                 <div class="text-rose-500/80 font-mono text-xs mt-1">${escapeHTML(errorMsg)}</div>`;
-    }
-
-    /**
-     * Standard security string encoder helper preventing visual markup injections
-     */
-    function escapeHTML(str) {
-        if (!str) return '';
-        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    // Connect form text input fields to RAG tracking routines
-    topicQueryForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const userInputText = topicInput.value.trim();
-        if (!userInputText) return;
-        postToDSATutor(userInputText);
-    });
-
-    // Connect standard solution button inputs to sandbox execution loops
-    submitSolutionBtn.addEventListener("click", () => {
-        const payloadScript = codeEditor.value.trim();
-        if (!payloadScript) {
-            alert("The code workspace editor is empty. Enter functional scripts before processing code evaluation.");
-            return;
-        }
-        
-        runtimeBadge.innerText = "SANDBOX RUNNING";
-        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-mono animate-pulse";
-        consoleLogs.innerHTML = `<div class="text-indigo-400 animate-pulse">&gt; Dispatching application text vector variables to non-networked container sandboxes...</div>`;
-        
-        // Pipe active text fields straight to standard post utility routes
-        postToDSATutor(payloadScript);
-    });
-
-    // Reset code areas back to default environment states
-    resetStubsBtn.addEventListener("click", () => {
-        codeEditor.value = "";
-        consoleLogs.innerHTML = `<div class="text-slate-600">// Sandbox container runtime inactive. Execution logs from background validation pipelines will render inside this console.</div>`;
-        runtimeBadge.innerText = "Awaiting Signal";
-        runtimeBadge.className = "text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-500 uppercase tracking-wider font-bold";
-    });
+  if (window.lucide) lucide.createIcons();
+  initEditor();
+  checkHealth();
+  $("tutorForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const message = $("promptInput").value.trim();
+    if (message) askTutor(message);
+  });
+  $("runCodeBtn").addEventListener("click", runCode);
+  $("resetCodeBtn").addEventListener("click", () => {
+    if (editor) editor.setValue("# Write your Python solution here\n\ndef solve():\n    pass\n\nif __name__ == '__main__':\n    solve()\n");
+  });
+  $("newSessionBtn").addEventListener("click", () => {
+    currentThreadId = null;
+    $("threadId").textContent = "New session";
+    $("answerContent").textContent = "New session started. Ask your tutor a question.";
+    $("challengeContent").textContent = "Your generated problem will appear here.";
+    setPill($("agentStatus"), "READY");
+  });
+  $("copyChallengeBtn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("challengeContent").textContent);
+      $("copyChallengeBtn").textContent = "Copied";
+      setTimeout(() => $("copyChallengeBtn").textContent = "Copy", 1200);
+    } catch { $("copyChallengeBtn").textContent = "Copy unavailable"; }
+  });
 });

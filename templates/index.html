@@ -1,154 +1,59 @@
-<!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<!doctype html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeetCode Style AI Code Arena & DSA Sandbox</title>
-    <!-- Tailwind CSS Engine for Native Layout Styling -->
-    <script src="https://tailwindcss.com"></script>
-    <!-- Lucide Icons System for Technical UI Accents -->
-    <script src="https://unpkg.com"></script>
-    <!-- Fixed script loader reference linking the client runtime engine -->
-    <script src="/static/script.js"></script>
-    <!-- Seamless connection to custom stylesheet configurations -->
-    <link rel="stylesheet" href="/static/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>DSA Arena — Agentic DSA Tutor</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 </head>
-<body class="h-full flex flex-col font-sans antialiased overflow-hidden selection:bg-indigo-900 selection:text-indigo-100">
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark"><i data-lucide="terminal"></i></span><span>DSA <b>ARENA</b><small>AGENTIC LEARNING WORKSPACE</small></span></a>
+    <div class="top-meta"><span class="status-dot"></span> API <b id="apiStatus">Checking</b><span class="divider-v"></span> SESSION <code id="threadId">New session</code></div>
+    <button class="icon-btn" id="newSessionBtn" title="New session"><i data-lucide="refresh-cw"></i></button>
+  </header>
 
-    <!-- TOP NAVIGATION BAR (LeetCode Inspired Header Structure) -->
-    <header class="h-12 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-4 shrink-0">
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-2">
-                <div class="p-1.5 bg-amber-500 rounded-md text-slate-950">
-                    <i data-lucide="terminal" class="w-4 h-4"></i>
-                </div>
-                <span class="text-sm font-semibold tracking-wide font-mono text-slate-200">DSA_ARENA v2.0</span>
-            </div>
-            
-            <nav class="flex items-center gap-1 text-xs text-slate-400">
-                <span class="px-2 py-1 bg-slate-800 rounded text-slate-300 font-mono">
-                    Thread Session: <span id="threadIdDisplay" class="text-indigo-400 font-bold">New Session</span>
-                </span>
-            </nav>
-        </div>
+  <main class="workspace">
+    <aside class="left-panel">
+      <section class="panel query-panel">
+        <div class="section-heading"><span class="step">01</span><div><h2>Ask your DSA tutor</h2><p>Learn a concept or generate a challenge</p></div></div>
+        <form id="tutorForm">
+          <textarea id="promptInput" rows="3" maxlength="8000" placeholder="e.g. Explain binary search trees and give me a medium-level challenge..."></textarea>
+          <div class="form-bottom"><span>Powered by your LangGraph agents</span><button class="primary-btn" id="askBtn" type="submit"><i data-lucide="send"></i> Ask tutor</button></div>
+        </form>
+      </section>
 
-        <!-- Infrastructure Status Badges -->
-        <div class="flex items-center gap-3 text-xs">
-            <div class="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-slate-400">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-                <span>Execution: <strong class="text-slate-200">Docker Isolated</strong></span>
-            </div>
-            <div class="flex items-center gap-2 bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-slate-400">
-                <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
-                <span>Orchestrator: <span id="nextAgentBadge" class="text-slate-200 font-bold">LangGraph Active</span></span>
-            </div>
-        </div>
-    </header>
+      <section class="panel answer-panel">
+        <div class="panel-title"><div><span class="step">02</span><h2>Tutor response</h2></div><span class="pill" id="agentStatus">READY</span></div>
+        <div class="answer-content" id="answerContent"><div class="empty-state"><i data-lucide="book-open"></i><h3>Your learning space</h3><p>Ask a question to receive explanations, examples and guided hints from your DSA agents.</p></div></div>
+      </section>
+      <section class="panel challenge-panel">
+        <div class="panel-title"><div><span class="step">03</span><h2>Challenge</h2></div><button class="subtle-btn" id="copyChallengeBtn" type="button">Copy</button></div>
+        <div id="challengeContent" class="challenge-content empty-small">Your generated problem will appear here.</div>
+      </section>
+    </aside>
 
-    <!-- CORE SPLIT PANELS LAYOUT -->
-    <main class="flex flex-1 overflow-hidden">
-        
-        <!-- ========================================== -->
-        <!-- LEFT COLUMN: RAG KNOWLEDGE & ANSWER SPACE  -->
-        <!-- ========================================== -->
-        <section class="w-[45%] flex flex-col border-r border-slate-800 bg-slate-900/40 overflow-hidden">
-            
-            <!-- 1. TOPIC QUERY CHANNEL -->
-            <div class="p-4 bg-slate-900 border-b border-slate-800 shrink-0">
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    1. Topic Query Channel
-                </label>
-                <form id="topicQueryForm" class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 focus-within:border-slate-600 transition">
-                    <input type="text" id="topicInput" 
-                           class="flex-1 bg-transparent px-3 py-1.5 text-xs text-slate-200 focus:outline-none placeholder-slate-600" 
-                           placeholder="Ask a question about a DSA topic (e.g., Give me a medium challenge on Binary Search Trees)..." autocomplete="off">
-                    <button type="submit" id="askBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-800 border border-slate-700 rounded-md text-xs font-medium text-slate-200 transition flex items-center gap-1.5">
-                        <i data-lucide="search" class="w-3.5 h-3.5"></i> Ask Router
-                    </button>
-                </form>
-            </div>
-
-            <!-- 2. AI KNOWLEDGE ANSWER GENERATION PANEL -->
-            <div class="flex-1 flex flex-col overflow-hidden">
-                <div class="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        2. AI Knowledge Answer Generation
-                    </span>
-                    <span id="ragStatus" class="text-[10px] px-2 py-0.5 rounded bg-slate-950 text-slate-500 font-mono">STANDBY</span>
-                </div>
-                
-                <div id="answerSpace" class="flex-1 p-5 overflow-y-auto font-sans text-sm text-slate-300 space-y-4 leading-relaxed bg-slate-950/40">
-                    <div class="text-slate-500 italic flex flex-col items-center justify-center h-full text-center p-6 border border-dashed border-slate-800 rounded-xl">
-                        <i data-lucide="book-open" class="w-8 h-8 text-slate-700 mb-2"></i>
-                        <span>Submit a message to prompt the Supervisor Router, pull explanations, and view complexity metrics.</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ========================================== -->
-        <!-- RIGHT COLUMN: LEETCODE STYLE ARENA         -->
-        <!-- ========================================== -->
-        <section class="w-[55%] flex flex-col bg-slate-950 overflow-hidden">
-            
-            <!-- 3. CODING CHALLENGE GENERATOR -->
-            <div class="h-44 border-b border-slate-800 flex flex-col bg-slate-900/60 overflow-hidden shrink-0">
-                <div class="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between shrink-0">
-                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        3. Coding Challenge Generation Prompt
-                    </span>
-                    <span id="llmCallsDisplay" class="text-[10px] text-slate-500 font-mono">Calls: 0</span>
-                </div>
-                
-                <div id="challengeSpace" class="flex-1 p-4 overflow-y-auto text-xs text-slate-300 leading-relaxed font-mono">
-                    <div class="text-slate-600 italic">No challenge loaded. Enter your request in the Topic Query Channel to initialize an assignment.</div>
-                </div>
-            </div>
-
-            <!-- 4. LEETCODE CODE EXECUTION SPACE -->
-            <div class="flex-1 flex flex-col overflow-hidden relative">
-                <!-- Workspace Tab Header Controls -->
-                <div class="h-9 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3 shrink-0 text-xs">
-                    <div class="flex items-center h-full">
-                        <div class="px-4 h-full flex items-center gap-2 tab-active font-mono text-slate-200 border-r border-slate-800 cursor-default">
-                            <i data-lucide="file-code" class="w-3.5 h-3.5 text-amber-500"></i>
-                            <span>solution.py</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-[10px] text-slate-500 uppercase tracking-widest font-mono">Isolated Container Core</span>
-                    </div>
-                </div>
-
-                <!-- Textarea Editor Workspace Box Layout -->
-                <div class="flex-1 flex relative overflow-hidden font-mono text-sm bg-slate-950">
-                    <!-- Line Count Markers -->
-                    <div class="w-10 bg-slate-950 text-right pr-2.5 select-none text-slate-700 pt-3 border-r border-slate-900/60 leading-6 text-xs shrink-0">
-                        1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12<br>13<br>14<br>15
-                    </div>
-                    <!-- Editor Target Text Area -->
-                    <textarea id="codeEditor" 
-                              class="flex-1 bg-transparent text-emerald-400 font-mono p-3 focus:outline-none resize-none leading-6 text-xs code-textarea focus:ring-0" 
-                              spellcheck="false" 
-                              placeholder="# Enter your solution script here..."></textarea>
-                </div>
-
-                <!-- Active Sandbox Operational Command Panel -->
-                <div class="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-4 shrink-0">
-                    <button id="resetStubsBtn" class="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition flex items-center gap-1.5">
-                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear Framework
-                    </button>
-                    <div class="flex items-center gap-2">
-                        <button id="submitSolutionBtn" class="px-5 py-1.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded text-xs font-semibold transition flex items-center gap-1.5 shadow-lg shadow-blue-950/20">
-                            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i> Submit Code
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Ephemeral Online Judge Terminal Console Output Panel -->
-            <div class="h-44 bg-slate-950 border-t border-slate-800 flex flex-col font-mono text-xs shrink-0">
-                <div class="px-4 py-2 bg-slate-900/60 border-b border-slate-800 text-slate-400 flex items-center justify-between shrink-0">
-                    <span class="flex items-center gap-2 font-semibold text-slate-300">
-                        <i data-lucide="terminal" class="w-3.5 h-3.5 text-slate-400"></i> Sandbox Execution Output
-                    </span>
+    <section class="right-panel">
+      <div class="editor-top">
+        <div class="file-tab"><i data-lucide="file-code-2"></i> solution.py <span class="unsaved-dot"></span></div>
+        <div class="editor-tools"><span class="language-label">PYTHON 3.11</span><button class="subtle-btn" id="resetCodeBtn" type="button"><i data-lucide="rotate-ccw"></i> Reset</button></div>
+      </div>
+      <div id="editor" aria-label="Python code editor"></div>
+      <div class="runbar">
+        <div class="run-info"><span class="status-dot"></span> Isolated Docker runner <small id="runHint">Ready to execute</small></div>
+        <button class="run-btn" id="runCodeBtn" type="button"><i data-lucide="play"></i> Run code</button>
+      </div>
+      <section class="output-panel">
+        <div class="output-heading"><div><i data-lucide="terminal"></i><h2>Execution results</h2></div><span class="pill" id="executionStatus">IDLE</span></div>
+        <div class="metrics-row"><div><span>RUNTIME</span><b id="runtimeValue">—</b></div><div><span>EXIT CODE</span><b id="exitValue">—</b></div><div><span>LLM CALLS</span><b id="llmCalls">0</b></div><div><span>NEXT AGENT</span><b id="nextAgent">—</b></div></div>
+        <div class="console" id="consoleOutput"><span class="console-muted">Output from your latest execution will appear here.</span></div>
+      </section>
+    </section>
+  </main>
+  <footer><span>DSA ARENA <b>v1.0</b></span><span>Learn · Solve · Evaluate</span><span>Do not submit secrets or personal data in code.</span></footer>
+  <script src="/static/script.js"></script>
+</body>
+</html>
