@@ -1,20 +1,27 @@
 from pathlib import Path
 import traceback
 import uvicorn
+import logging
+import os
+import asyncio
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from agents.supervisor import run_DSA_tutor_agent
+from services.code_executor import execute_python
+from schemas.requests import TutorRequest, ExecuteRequest
 
 BASE_DIR = Path(__file__).resolve().parent
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("dsa_tutor")
 
 app = FastAPI(
     title="Agentic DSA Tutor Interactive Code Evaluator",
-    description="LagGraph Multi-Agent DSA Tutor Interactive Code Evaluator",
+    description="LagGraph Multi-Agent DSA Tutor & Interactive Code Evaluator",
     version="1.0.0"
 )
 
@@ -103,6 +110,24 @@ async def health_check():
 @app.get("/favicon.ico")
 async def favicon():
     return JSONResponse(content={})
+
+
+@app.post("/api/execute")
+async def execute(payload: ExecuteRequest):
+    code = payload.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Enter Python code before running.")
+    if len(code.encode("utf-8")) > 50_000:
+        raise HTTPException(status_code=413, detail="Code exceeds the 50 KB limit.")
+    try:
+        result = await asyncio.to_thread(execute_python, code, payload.stdin)
+        return {"success": True, **result}
+    except RuntimeError as exc:
+        logger.warning("Execution service unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception:
+        logger.exception("Code execution failed")
+        raise HTTPException(status_code=500, detail="Code execution service failed.")
 
 
 
