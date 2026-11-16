@@ -1,59 +1,207 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
+
   <title>DSA Arena — Agentic DSA Tutor</title>
+
+  <!-- Application CSS -->
   <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
-  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+
+
+
+<!-- 1. Load Marked before Monaco -->
+<script>
+  // Prevent Monaco's AMD loader from intercepting Marked.
+  window.define = undefined;
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+
+<script>
+  console.log("Marked loaded:", typeof window.marked);
+  console.log("Marked parser:", typeof window.marked?.parse);
+</script>
+<!-- 2. Load DOMPurify before Monaco -->
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js">
+</script>
+
+<!-- 3. Configure Monaco AMD loader -->
+<script>
+  window.MonacoEnvironment = {
+    getWorkerUrl: function () {
+      return "data:text/javascript;charset=utf-8," +
+        encodeURIComponent(
+          "self.MonacoEnvironment = { baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/' }; " +
+          "importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/base/worker/workerMain.js');"
+        );
+    }
+  };
+</script>
+
+<!-- 4. Load Monaco after the other libraries -->
+<script
+  src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js">
+</script>
+
+<!-- 5. Load your application last -->
+<script src="/static/script.js" defer></script>
+
 </head>
 <body>
+
   <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark"><i data-lucide="terminal"></i></span><span>DSA <b>ARENA</b><small>AGENTIC LEARNING WORKSPACE</small></span></a>
-    <div class="top-meta"><span class="status-dot"></span> API <b id="apiStatus">Checking</b><span class="divider-v"></span> SESSION <code id="threadId">New session</code></div>
-    <button class="icon-btn" id="newSessionBtn" title="New session"><i data-lucide="refresh-cw"></i></button>
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">
+        <i data-lucide="terminal"></i>
+      </span>
+      <span>
+        DSA <b>ARENA</b>
+        <small>AGENTIC LEARNING WORKSPACE</small>
+      </span>
+    </a>
+
+    <div class="top-meta" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      API <b id="apiStatus">Checking</b>
+      <span class="divider-v" aria-hidden="true"></span>
+      SESSION <code id="threadId">New session</code>
+    </div>
+
+    <button class="icon-btn" id="newSessionBtn" title="New session" aria-label="Start new session" type="button">
+      <i data-lucide="refresh-cw" aria-hidden="true"></i>
+    </button>
   </header>
 
   <main class="workspace">
+    <h1 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">
+      DSA Arena — Agentic Learning Workspace
+    </h1>
+
     <aside class="left-panel">
-      <section class="panel query-panel">
-        <div class="section-heading"><span class="step">01</span><div><h2>Ask your DSA tutor</h2><p>Learn a concept or generate a challenge</p></div></div>
+      <section class="panel query-panel" aria-labelledby="queryHeading">
+        <div class="section-heading">
+          <span class="step" aria-hidden="true">01</span>
+          <div>
+            <h2 id="queryHeading">Ask your DSA tutor</h2>
+            <p>Ask theory questions or request a coding challenge</p>
+          </div>
+        </div>
+
         <form id="tutorForm">
-          <textarea id="promptInput" rows="3" maxlength="8000" placeholder="e.g. Explain binary search trees and give me a medium-level challenge..."></textarea>
-          <div class="form-bottom"><span>Powered by your LangGraph agents</span><button class="primary-btn" id="askBtn" type="submit"><i data-lucide="send"></i> Ask tutor</button></div>
+          <textarea
+            id="promptInput"
+            aria-label="Ask your DSA tutor"
+            rows="3"
+            maxlength="8000"
+            placeholder="e.g. Explain binary search trees in detail, or generate a medium-level graph challenge..."
+            required
+          ></textarea>
+          <div class="form-bottom">
+            <span>Powered by your LangGraph agents</span>
+            <button class="primary-btn" id="askBtn" type="submit">
+              <i data-lucide="send" aria-hidden="true"></i> Ask tutor
+            </button>
+          </div>
         </form>
       </section>
 
-      <section class="panel answer-panel">
-        <div class="panel-title"><div><span class="step">02</span><h2>Tutor response</h2></div><span class="pill" id="agentStatus">READY</span></div>
-        <div class="answer-content" id="answerContent"><div class="empty-state"><i data-lucide="book-open"></i><h3>Your learning space</h3><p>Ask a question to receive explanations, examples and guided hints from your DSA agents.</p></div></div>
-      </section>
-      <section class="panel challenge-panel">
-        <div class="panel-title"><div><span class="step">03</span><h2>Challenge</h2></div><button class="subtle-btn" id="copyChallengeBtn" type="button">Copy</button></div>
-        <div id="challengeContent" class="challenge-content empty-small">Your generated problem will appear here.</div>
+      <!-- Tutor response fills all remaining left-panel space. Challenge and theory render here. -->
+      <section class="panel answer-panel" aria-labelledby="responseHeading">
+        <div class="panel-title">
+          <div>
+            <span class="step" aria-hidden="true">02</span>
+            <h2 id="responseHeading">Tutor response</h2>
+          </div>
+          <div class="response-actions">
+            <span class="pill" id="agentStatus" role="status" aria-live="polite">READY</span>
+            <button class="subtle-btn" id="copyResponseBtn" type="button">
+              <i data-lucide="copy" aria-hidden="true"></i> Copy
+            </button>
+          </div>
+        </div>
+
+        <div class="answer-content markdown-body" id="answerContent" aria-live="polite">
+          <div class="empty-state">
+            <i data-lucide="book-open" aria-hidden="true"></i>
+            <h3>Your learning space</h3>
+            <p>Ask a question for detailed explanations, examples, coding challenges, hints and solutions.</p>
+          </div>
+        </div>
       </section>
     </aside>
 
-    <section class="right-panel">
+    <section class="right-panel" aria-label="Code editor and execution">
       <div class="editor-top">
-        <div class="file-tab"><i data-lucide="file-code-2"></i> solution.py <span class="unsaved-dot"></span></div>
-        <div class="editor-tools"><span class="language-label">PYTHON 3.11</span><button class="subtle-btn" id="resetCodeBtn" type="button"><i data-lucide="rotate-ccw"></i> Reset</button></div>
+        <div class="file-tab">
+          <i data-lucide="file-code-2" aria-hidden="true"></i>
+          solution.py
+          <span class="unsaved-dot" title="Unsaved changes"></span>
+        </div>
+        <div class="editor-tools">
+          <span class="language-label">PYTHON 3.11</span>
+          <button class="subtle-btn" id="resetCodeBtn" type="button">
+            <i data-lucide="rotate-ccw" aria-hidden="true"></i> Reset
+          </button>
+        </div>
       </div>
-      <div id="editor" aria-label="Python code editor"></div>
+
+      <div id="editor" role="region" aria-label="Python code editor"></div>
+
       <div class="runbar">
-        <div class="run-info"><span class="status-dot"></span> Isolated Docker runner <small id="runHint">Ready to execute</small></div>
-        <button class="run-btn" id="runCodeBtn" type="button"><i data-lucide="play"></i> Run code</button>
+        <div class="run-info">
+          <span class="status-dot" aria-hidden="true"></span>
+          Isolated Docker runner
+          <small id="runHint">Ready to execute</small>
+        </div>
+        <button class="run-btn" id="runCodeBtn" type="button">
+          <i data-lucide="play" aria-hidden="true"></i> Run code
+        </button>
       </div>
-      <section class="output-panel">
-        <div class="output-heading"><div><i data-lucide="terminal"></i><h2>Execution results</h2></div><span class="pill" id="executionStatus">IDLE</span></div>
-        <div class="metrics-row"><div><span>RUNTIME</span><b id="runtimeValue">—</b></div><div><span>EXIT CODE</span><b id="exitValue">—</b></div><div><span>LLM CALLS</span><b id="llmCalls">0</b></div><div><span>NEXT AGENT</span><b id="nextAgent">—</b></div></div>
-        <div class="console" id="consoleOutput"><span class="console-muted">Output from your latest execution will appear here.</span></div>
+
+      <section class="output-panel" aria-labelledby="outputHeading">
+        <div class="output-heading">
+          <div>
+            <i data-lucide="terminal" aria-hidden="true"></i>
+            <h2 id="outputHeading">Execution results</h2>
+          </div>
+          <span class="pill" id="executionStatus" role="status" aria-live="polite">IDLE</span>
+        </div>
+
+        <div class="metrics-row">
+          <div>
+            <span>RUNTIME</span>
+            <b id="runtimeValue">—</b>
+          </div>
+          <div>
+            <span>EXIT CODE</span>
+            <b id="exitValue">—</b>
+          </div>
+          <div>
+            <span>LLM CALLS</span>
+            <b id="llmCalls">0</b>
+          </div>
+          <div>
+            <span>NEXT AGENT</span>
+            <b id="nextAgent">—</b>
+          </div>
+        </div>
+
+        <div class="console" id="consoleOutput" role="log" aria-live="polite">
+          <span class="console-muted">Output from your latest execution will appear here.</span>
+        </div>
       </section>
     </section>
   </main>
-  <footer><span>DSA ARENA <b>v1.0</b></span><span>Learn · Solve · Evaluate</span><span>Do not submit secrets or personal data in code.</span></footer>
-  <script src="/static/script.js"></script>
+
+  <footer>
+    <span>DSA ARENA <b>v2.0</b></span>
+    <span>Learn · Solve · Evaluate</span>
+    <span>Do not submit secrets or personal data in code.</span>
+  </footer>
 </body>
 </html>
