@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from agents.supervisor import run_DSA_tutor_agent
+from agents.supervisor_test_2 import run_DSA_tutor_agent
 from services.code_executor import execute_python
 from schemas.requests import TutorRequest, ExecuteRequest
 
