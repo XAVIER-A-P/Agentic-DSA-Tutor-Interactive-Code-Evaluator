@@ -1,52 +1,78 @@
-from agents.challenge_generator import challenge_generator
-from agents.code_evaluator import code_evaluator
-from agents.theory_expert import answer_textbook_query
-from agents.supervisor import run_DSA_tutor_agent
+from __future__ import annotations
 
-# res = answer_textbook_query("What is Binary Search Tree")
+import asyncio
+import logging
+import os
+import uuid
+from pathlib import Path
+from typing import Any
 
-# print(res)
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+from pydantic import BaseModel, Field
 
+from agents.supervisor_test_2 import run_DSA_tutor_agent
+from services.code_executor import execute_python
+from schemas.requests import TutorRequest, ExecuteRequest
 
-user_input = input("Enter a topic : ")
+BASE_DIR = Path(__file__).resolve().parent
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+logger = logging.getLogger("dsa_tutor")
 
-response = run_DSA_tutor_agent(
-    user_input=user_input,
-    thread_id="test_user"
+app = FastAPI(
+    title="Agentic DSA Tutor",
+    description="Multi-agent DSA learning and isolated Python code evaluation",
+    version="1.0.0",
 )
-
-print("\nFINAL RESPONSE\n")
-print(response["answer"])
-
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(request=request, name="index.html", context={})
 
 
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "agentic-dsa-tutor"}
 
 
-# res = challenge_generator("""You are a Curriculum Designer. Based on the topic 'Binary Trees', 
-#     generate a LeetCode-style challenge. Provide a description, function signature, and 3 test cases.""")
+@app.post("/api/tutor")
+async def tutor(payload: TutorRequest):
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    thread_id = payload.thread_id or str(uuid.uuid4())
+    try:
+        result = await asyncio.to_thread(run_DSA_tutor_agent, message, thread_id)
+        return {"success": True, **result}
+    except Exception:
+        logger.exception("Tutor agent failed")
+        raise HTTPException(status_code=500, detail="The tutor workflow failed. Check server logs.")
 
 
-# question = "Find the node in a Binary Search Tree (BST) where the node's value equals val, and return that subtree; return None if the node doesn't exist. BST properties ensure left child nodes are smaller and right child nodes are larger than the parent." 
-
-# answer = """ class Solution:
-#     def searchBST(self, root: Optional[TreeNode], val: int) -> Optional[TreeNode]:
-#         current = root
-#         while current is not None:
-#             if current.val == val:
-#                 return current
-#             elif val < current.val:
-#                 current = current.left
-#             else:
-#                 current = current.right
-#         return None 
-#         """
-
-
-# res = code_evaluator(f"Evaluate this code: {answer} against this challenge: {question}")
-
-# print(res)
+@app.post("/api/execute")
+async def execute(payload: ExecuteRequest):
+    code = payload.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Enter Python code before running.")
+    if len(code.encode("utf-8")) > 50_000:
+        raise HTTPException(status_code=413, detail="Code exceeds the 50 KB limit.")
+    try:
+        result = await asyncio.to_thread(execute_python, code, payload.stdin)
+        return {"success": True, **result}
+    except RuntimeError as exc:
+        logger.warning("Execution service unavailable: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+    except Exception:
+        logger.exception("Code execution failed")
+        raise HTTPException(status_code=500, detail="Code execution service failed.")
 
 
-
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
